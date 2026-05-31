@@ -1,27 +1,26 @@
 import { useState, useEffect } from "react";
 
-// ── CONSTANTS ──────────────────────────────────────────────────────────────
+// ── SUPABASE CONFIG ────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://vjqizblyiaoelhwpornd.supabase.co";
 const SUPABASE_KEY = "sb_publishable_ndTm8Ga9fdGqD76LIiCSTg_YtrJv27d";
 
-// Supabase REST API helper
 const sb = {
   async query(table, method="GET", body=null, filter="") {
+    const session = JSON.parse(localStorage.getItem("ws_session")||"null");
+    const token = session?.access_token || SUPABASE_KEY;
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${filter}`, {
       method,
       headers: {
         "apikey": SUPABASE_KEY,
-        "Authorization": `Bearer ${SUPABASE_KEY}`,
+        "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
-        "Prefer": method==="POST" ? "return=representation" : "",
+        "Prefer": method==="POST" ? "return=representation" : method==="PATCH" ? "return=representation" : "",
       },
       body: body ? JSON.stringify(body) : null,
     });
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(err);
-    }
-    return method==="DELETE" ? null : res.json();
+    if (method==="DELETE") return null;
+    const text = await res.text();
+    try { return JSON.parse(text); } catch(e) { return null; }
   },
   async signUp(email, password, meta) {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
@@ -37,20 +36,25 @@ const sb = {
       headers: { "apikey": SUPABASE_KEY, "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    return res.json();
+    const data = await res.json();
+    if (data.access_token) {
+      localStorage.setItem("ws_session", JSON.stringify(data));
+    }
+    return data;
   },
-  async signOut(token) {
-    await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
-      method: "POST",
-      headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${token}` },
-    });
+  async signOut() {
+    const session = JSON.parse(localStorage.getItem("ws_session")||"null");
+    if (session?.access_token) {
+      await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+        method: "POST",
+        headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}` },
+      });
+    }
+    localStorage.removeItem("ws_session");
   },
-  async getUser(token) {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${token}` },
-    });
-    return res.json();
-  },
+  getStoredSession() {
+    try { return JSON.parse(localStorage.getItem("ws_session")||"null"); } catch(e) { return null; }
+  }
 };
 
 const PLANS = [
@@ -206,7 +210,7 @@ function HomePage({ setPage }) {
       <div style={{ padding:"80px 20px", maxWidth:1100, margin:"0 auto" }}>
         <h2 style={{ textAlign:"center", fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:34, marginBottom:48 }}>Comment ça fonctionne</h2>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:20 }}>
-          {[{step:"01",icon:"📝",title:"Inscription",desc:"Créez votre compte en moins de 2 minutes. Email de vérification automatique."},{step:"02",icon:"💰",title:"Déposez",desc:"Envoyez vos USDT sur notre wallet BEP20 sécurisé. Minimum 40 USDT."},{step:"03",icon:"📈",title:"Investissez",desc:"Choisissez votre plan VIP et activez vos profits quotidiens."},{step:"04",icon:"💸",title:"Retirez",desc:"Retirez vos gains à tout moment. Validation sous 24h."}].map(s=>(
+          {[{step:"01",icon:"📝",title:"Inscription",desc:"Créez votre compte en moins de 2 minutes."},{step:"02",icon:"💰",title:"Déposez",desc:"Envoyez vos USDT sur notre wallet BEP20. Minimum 40 USDT."},{step:"03",icon:"📈",title:"Investissez",desc:"Choisissez votre plan VIP et activez vos profits."},{step:"04",icon:"💸",title:"Retirez",desc:"Retirez vos gains à tout moment. Validation sous 24h."}].map(s=>(
             <Card key={s.step} style={{ position:"relative", overflow:"hidden" }}>
               <div style={{ position:"absolute", top:-10, right:-10, fontSize:55, fontWeight:900, color:"#00d4aa0a", fontFamily:"'Syne',sans-serif" }}>{s.step}</div>
               <div style={{ fontSize:34, marginBottom:12 }}>{s.icon}</div>
@@ -293,7 +297,7 @@ function AboutPage() {
     <div style={{ padding:"60px 20px", maxWidth:900, margin:"0 auto" }}>
       <h1 style={{ fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:40, marginBottom:24 }}>À propos de World Success USDT</h1>
       <Card style={{ marginBottom:20 }}><h2 style={{ fontFamily:"'Syne',sans-serif", marginBottom:12 }}>🌍 Notre Mission</h2><p style={{ color:"var(--muted)", lineHeight:1.8 }}>World Success USDT est une plateforme d'investissement crypto permettant à chacun de faire croître son patrimoine grâce à des plans transparents et sécurisés sur le réseau BEP20.</p></Card>
-      <Card style={{ marginBottom:20 }}><h2 style={{ fontFamily:"'Syne',sans-serif", marginBottom:12 }}>🔒 Sécurité & Transparence</h2><p style={{ color:"var(--muted)", lineHeight:1.8 }}>Toutes les transactions sont effectuées sur le réseau BEP20. Nos wallets sont publiquement vérifiables. La vérification email protège chaque compte utilisateur.</p></Card>
+      <Card style={{ marginBottom:20 }}><h2 style={{ fontFamily:"'Syne',sans-serif", marginBottom:12 }}>🔒 Sécurité & Transparence</h2><p style={{ color:"var(--muted)", lineHeight:1.8 }}>Toutes les transactions sont effectuées sur le réseau BEP20. Nos wallets sont publiquement vérifiables.</p></Card>
       <Card>
         <h2 style={{ fontFamily:"'Syne',sans-serif", marginBottom:16 }}>📊 Nos Chiffres</h2>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))", gap:16 }}>
@@ -329,7 +333,7 @@ function FAQPage() {
   );
 }
 
-function ContactPage({ token }) {
+function ContactPage() {
   const [form, setForm] = useState({ name:"", email:"", message:"" });
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -339,7 +343,7 @@ function ContactPage({ token }) {
     try {
       await sb.query("support_messages","POST",{ ...form, status:"nouveau", created_at:new Date().toISOString() });
       setSent(true);
-    } catch(e) { console.error(e); setSent(true); }
+    } catch(e) { setSent(true); }
     setLoading(false);
   };
   return (
@@ -363,14 +367,13 @@ function ContactPage({ token }) {
         </Card>
       ) : (
         <Card>
-          <h3 style={{ fontFamily:"'Syne',sans-serif", marginBottom:20 }}>💬 Envoyer un message</h3>
           <Input label="Nom complet" value={form.name} onChange={v=>setForm({...form,name:v})} placeholder="John Doe" />
           <Input label="Email" type="email" value={form.email} onChange={v=>setForm({...form,email:v})} placeholder="vous@email.com" required />
           <div style={{ marginBottom:16 }}>
-            <label style={{ display:"block", marginBottom:6, fontSize:13, fontWeight:600, color:"var(--muted)" }}>Message <span style={{color:"#ff4d6d"}}>*</span></label>
+            <label style={{ display:"block", marginBottom:6, fontSize:13, fontWeight:600, color:"var(--muted)" }}>Message</label>
             <textarea value={form.message} onChange={e=>setForm({...form,message:e.target.value})} rows={5} placeholder="Votre message..." style={{ width:"100%", padding:"12px 14px", background:"var(--input)", border:"1.5px solid var(--border)", borderRadius:10, color:"var(--text)", fontSize:15, fontFamily:"'DM Sans',sans-serif", resize:"vertical", boxSizing:"border-box" }} />
           </div>
-          <Btn style={{ width:"100%" }} onClick={handleSend} disabled={!form.email||!form.message||loading}>{loading?<Spinner />:"Envoyer le message"}</Btn>
+          <Btn style={{ width:"100%" }} onClick={handleSend} disabled={!form.email||!form.message||loading}>{loading?<Spinner />:"Envoyer"}</Btn>
         </Card>
       )}
     </div>
@@ -391,7 +394,7 @@ function RegisterPage({ setPage, setSession }) {
     setLoading(true); setError("");
     try {
       const data = await sb.signUp(form.email, form.password, { nom:form.nom, prenom:form.prenom });
-      if (data.error) throw new Error(data.error.message||data.msg||"Erreur inscription");
+      if (data.error) throw new Error(data.error.message||"Erreur inscription");
       const uid = data.user?.id;
       if (uid) {
         await sb.query("profiles","POST",{
@@ -401,7 +404,6 @@ function RegisterPage({ setPage, setSession }) {
           is_admin:false, blocked:false, created_at:new Date().toISOString()
         });
       }
-      if (data.session) { setSession(data.session); }
       setStep(2);
     } catch(e) {
       if (e.message?.includes("already")) setError("Cet email est déjà utilisé.");
@@ -417,7 +419,6 @@ function RegisterPage({ setPage, setSession }) {
         <div style={{ display:"flex", justifyContent:"center", gap:8, marginBottom:8 }}>
           {[1,2].map(s=><div key={s} style={{ width:40, height:4, borderRadius:4, background:step>=s?"#00d4aa":"var(--border)", transition:"background 0.3s" }} />)}
         </div>
-        <p style={{ color:"var(--muted)", fontSize:14 }}>Étape {step} sur 2</p>
       </div>
       {error&&<Alert type="error">{error}</Alert>}
       {step===1 ? (
@@ -442,8 +443,8 @@ function RegisterPage({ setPage, setSession }) {
         <Card>
           <div style={{ textAlign:"center", marginBottom:24 }}>
             <div style={{ fontSize:48, marginBottom:12 }}>✉️</div>
-            <h3 style={{ fontFamily:"'Syne',sans-serif" }}>Compte créé avec succès !</h3>
-            <p style={{ color:"var(--muted)", fontSize:14 }}>Un email de confirmation a été envoyé à <strong>{form.email}</strong>.</p>
+            <h3 style={{ fontFamily:"'Syne',sans-serif" }}>Compte créé !</h3>
+            <p style={{ color:"var(--muted)", fontSize:14 }}>Vérifiez votre email <strong>{form.email}</strong> et cliquez le lien de confirmation.</p>
           </div>
           <Alert type="success">🎉 Votre code parrain : <strong style={{ letterSpacing:2, fontSize:18 }}>{code}</strong></Alert>
           <Btn style={{ width:"100%" }} onClick={()=>setPage("login")}>Se connecter →</Btn>
@@ -464,10 +465,17 @@ function LoginPage({ setPage, setSession }) {
     setLoading(true); setError("");
     try {
       const data = await sb.signIn(form.email, form.password);
-      if (data.error||!data.access_token) throw new Error(data.error_description||data.msg||"Identifiants incorrects");
+      if (!data.access_token) throw new Error("Identifiants incorrects");
       setSession(data);
-      setPage("dashboard");
-    } catch(e) { setError("Email ou mot de passe incorrect."); }
+      const profiles = await sb.query("profiles","GET",null,`?id=eq.${data.user.id}`);
+      if (profiles && profiles[0]?.is_admin) {
+        setPage("admin");
+      } else {
+        setPage("dashboard");
+      }
+    } catch(e) {
+      setError("Email ou mot de passe incorrect.");
+    }
     setLoading(false);
   };
 
@@ -504,7 +512,7 @@ function DashboardPage({ session, setPage, setSession }) {
   const [copied, setCopied] = useState("");
 
   const showNotif = msg => { setNotif(msg); setTimeout(()=>setNotif(""),3000); };
-  const copy = (text,key) => { navigator.clipboard.writeText(text).catch(()=>{}); setCopied(key); setTimeout(()=>setCopied(""),2000); };
+  const copy = (text,key) => { try { navigator.clipboard.writeText(text); } catch(e) {} setCopied(key); setTimeout(()=>setCopied(""),2000); };
   const fmt = v => typeof v==="number"?v.toFixed(2):"0.00";
 
   useEffect(()=>{
@@ -524,7 +532,7 @@ function DashboardPage({ session, setPage, setSession }) {
       setProfile(p=>({...p,balance:(p.balance||0)-amount}));
       showNotif("✅ Demande de retrait soumise !");
       setWithAmount(""); setWithAddress("");
-    } catch(e) { showNotif("❌ Erreur : "+e.message); }
+    } catch(e) { showNotif("❌ Erreur"); }
     setLoading(false);
   };
 
@@ -535,13 +543,14 @@ function DashboardPage({ session, setPage, setSession }) {
       await sb.query("transactions","POST",{ user_id:session.user.id, type:"Activation Plan", amount:0, status:"Actif", plan_name:plan.name, created_at:new Date().toISOString() });
       setProfile(p=>({...p,active_plan:plan}));
       showNotif(`✅ Plan ${plan.name} activé !`);
-    } catch(e) { showNotif("❌ Erreur : "+e.message); }
+    } catch(e) { showNotif("❌ Erreur"); }
     setLoading(false);
   };
 
   const handleLogout = async () => {
-    try { await sb.signOut(session.access_token); } catch(e) {}
-    setSession(null); setPage("home");
+    await sb.signOut();
+    setSession(null);
+    setPage("home");
   };
 
   const tabs = [
@@ -554,7 +563,12 @@ function DashboardPage({ session, setPage, setSession }) {
     {id:"settings",label:"Paramètres",icon:"⚙️"},
   ];
 
-  if (!profile) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"60vh", flexDirection:"column", gap:16 }}><Spinner /><p style={{color:"var(--muted)"}}>Chargement...</p></div>;
+  if (!profile) return (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"60vh", flexDirection:"column", gap:16 }}>
+      <div style={{ width:40, height:40, border:"3px solid #00d4aa44", borderTop:"3px solid #00d4aa", borderRadius:"50%", animation:"spin 0.8s linear infinite" }} />
+      <p style={{color:"var(--muted)"}}>Chargement de votre profil...</p>
+    </div>
+  );
 
   return (
     <div style={{ display:"flex", minHeight:"calc(100vh - 70px)" }}>
@@ -586,7 +600,7 @@ function DashboardPage({ session, setPage, setSession }) {
             {profile.active_plan&&(
               <Card glow style={{ marginBottom:20, borderColor:"#00d4aa44" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
-                  <div><Badge color="#00d4aa">✅ Plan actif</Badge><h3 style={{ fontFamily:"'Syne',sans-serif", margin:"8px 0 4px" }}>{profile.active_plan.name}</h3><p style={{ color:"var(--muted)", fontSize:14, margin:0 }}>+{profile.active_plan.profit} USDT/jour · 30 jours</p></div>
+                  <div><Badge color="#00d4aa">✅ Plan actif</Badge><h3 style={{ fontFamily:"'Syne',sans-serif", margin:"8px 0 4px" }}>{profile.active_plan.name}</h3><p style={{ color:"var(--muted)", fontSize:14, margin:0 }}>+{profile.active_plan.profit} USDT/jour</p></div>
                   <div style={{ textAlign:"right" }}><div style={{ fontSize:26, fontWeight:900, color:"#00d4aa", fontFamily:"'Syne',sans-serif" }}>+{profile.active_plan.profit}</div><div style={{ fontSize:12, color:"var(--muted)" }}>USDT/jour</div></div>
                 </div>
               </Card>
@@ -627,7 +641,7 @@ function DashboardPage({ session, setPage, setSession }) {
                 </Card>
               ))}
             </div>
-            <Alert type="error">⚠️ N'envoyez jamais sur un autre réseau que BEP20 — fonds définitivement perdus.</Alert>
+            <Alert type="error">⚠️ N'envoyez jamais sur un autre réseau que BEP20.</Alert>
           </div>
         )}
 
@@ -644,7 +658,7 @@ function DashboardPage({ session, setPage, setSession }) {
                   <div style={{ background:"var(--bg)", borderRadius:10, padding:"10px 12px", marginBottom:14, fontSize:12 }}>
                     <div style={{ display:"flex", justifyContent:"space-between" }}><span style={{color:"var(--muted)"}}>Montant</span><strong>{withAmount} USDT</strong></div>
                     <div style={{ display:"flex", justifyContent:"space-between", marginTop:5 }}><span style={{color:"var(--muted)"}}>Frais (1%)</span><strong style={{color:"#ff4d6d"}}>-{(parseFloat(withAmount)*0.01).toFixed(2)}</strong></div>
-                    <div style={{ display:"flex", justifyContent:"space-between", marginTop:5, borderTop:"1px solid var(--border)", paddingTop:5 }}><strong>Recevez</strong><strong style={{color:"#00d4aa"}}>{(parseFloat(withAmount)*0.99).toFixed(2)} USDT</strong></div>
+                    <div style={{ display:"flex", justifyContent:"space-between", marginTop:5, borderTop:"1px solid var(--border)", paddingTop:5 }}><strong>Recevrez</strong><strong style={{color:"#00d4aa"}}>{(parseFloat(withAmount)*0.99).toFixed(2)} USDT</strong></div>
                   </div>
                 )}
                 <Btn style={{width:"100%"}} onClick={handleWithdraw} disabled={!withAmount||parseFloat(withAmount)<11||!withAddress||loading}>{loading?<Spinner />:"Soumettre"}</Btn>
@@ -692,7 +706,6 @@ function DashboardPage({ session, setPage, setSession }) {
                 <div style={{ flex:1, background:"var(--bg)", borderRadius:10, padding:"12px 16px", fontFamily:"monospace", fontSize:20, fontWeight:900, letterSpacing:4, color:"#00d4aa" }}>{profile.code||"—"}</div>
                 <Btn onClick={()=>copy(profile.code,"ref")}>{copied==="ref"?"✅ Copié !":"📋 Copier"}</Btn>
               </div>
-              <p style={{ color:"var(--muted)", fontSize:13, marginTop:10, marginBottom:0 }}>Partagez ce code et gagnez des commissions sur 3 niveaux automatiquement.</p>
             </Card>
           </div>
         )}
@@ -731,10 +744,9 @@ function DashboardPage({ session, setPage, setSession }) {
               <Card>
                 <h3 style={{ fontFamily:"'Syne',sans-serif", marginBottom:12 }}>✅ Statut KYC</h3>
                 <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:10 }}>
-                  <Badge color="#00d4aa">📧 Email enregistré</Badge>
+                  <Badge color="#00d4aa">📧 Email vérifié</Badge>
                   <Badge color="#00d4aa">📱 Tél. enregistré</Badge>
                 </div>
-                <p style={{ color:"var(--muted)", fontSize:13, margin:0 }}>Compte sécurisé via Supabase Auth.</p>
               </Card>
             </div>
           </div>
@@ -745,7 +757,7 @@ function DashboardPage({ session, setPage, setSession }) {
 }
 
 // ── ADMIN ──────────────────────────────────────────────────────────────────
-function AdminPage() {
+function AdminPage({ setPage, setSession }) {
   const [tab, setTab] = useState("stats");
   const [users, setUsers] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
@@ -769,12 +781,17 @@ function AdminPage() {
     await sb.query("transactions","PATCH",{status:"Refusé"},`?id=eq.${w.id}`);
     if (u) await sb.query("profiles","PATCH",{balance:(u.balance||0)+Math.abs(w.amount)},`?id=eq.${w.user_id}`);
     setWithdrawals(p=>p.filter(x=>x.id!==w.id));
-    showNotif("❌ Retrait refusé, remboursé.");
+    showNotif("❌ Retrait refusé.");
   };
   const toggleBlock = async u => {
     await sb.query("profiles","PATCH",{blocked:!u.blocked},`?id=eq.${u.id}`);
     setUsers(p=>p.map(x=>x.id===u.id?{...x,blocked:!x.blocked}:x));
     showNotif(u.blocked?"✅ Débloqué !":"🚫 Bloqué !");
+  };
+  const handleLogout = async () => {
+    await sb.signOut();
+    setSession(null);
+    setPage("home");
   };
 
   const adminTabs = [{id:"stats",label:"Statistiques",icon:"📊"},{id:"users",label:"Utilisateurs",icon:"👥"},{id:"withdrawals",label:"Retraits",icon:"💸"},{id:"messages",label:"Support",icon:"💬"},{id:"wallets",label:"Wallets",icon:"🏦"}];
@@ -785,13 +802,13 @@ function AdminPage() {
       <div style={{ width:210, background:"var(--card)", borderRight:"1px solid var(--border)", padding:"20px 10px", flexShrink:0 }}>
         <div style={{ padding:"10px 12px", background:"#ff4d6d22", border:"1px solid #ff4d6d44", borderRadius:10, marginBottom:16 }}>
           <div style={{ fontWeight:800, fontFamily:"'Syne',sans-serif", fontSize:13, color:"#ff4d6d" }}>🛡️ Panel Admin</div>
-          <div style={{ fontSize:11, color:"var(--muted)", marginTop:2 }}>Supabase</div>
         </div>
         {adminTabs.map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)} style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px", width:"100%", borderRadius:10, border:"none", cursor:"pointer", textAlign:"left", background:tab===t.id?"rgba(255,77,109,0.12)":"transparent", color:tab===t.id?"#ff4d6d":"var(--muted)", fontWeight:tab===t.id?700:500, fontSize:13, fontFamily:"'DM Sans',sans-serif", marginBottom:3 }}>
             <span>{t.icon}</span>{t.label}
           </button>
         ))}
+        <button onClick={handleLogout} style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px", width:"100%", borderRadius:10, border:"none", cursor:"pointer", background:"transparent", color:"#ff4d6d", fontSize:13, fontFamily:"'DM Sans',sans-serif", marginTop:16 }}>🚪 Déconnexion</button>
       </div>
 
       <div style={{ flex:1, padding:"24px", overflowY:"auto" }}>
@@ -891,6 +908,16 @@ export default function App() {
   const [dark, setDark] = useState(true);
   const [page, setPage] = useState("home");
   const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(()=>{
+    // Récupérer la session sauvegardée
+    const stored = sb.getStoredSession();
+    if (stored?.access_token) {
+      setSession(stored);
+    }
+    setAuthLoading(false);
+  },[]);
 
   const theme = dark
     ?{ "--bg":"#0d1117","--card":"#161b22","--input":"#0d1117","--text":"#e6edf3","--muted":"#8b949e","--border":"#30363d","--accent":"#00d4aa" }
@@ -904,6 +931,19 @@ export default function App() {
   `;
 
   const nav = [{id:"home",label:"Accueil"},{id:"plans",label:"Plans VIP"},{id:"about",label:"À propos"},{id:"faq",label:"FAQ"},{id:"contact",label:"Contact"}];
+
+  if (authLoading) return (
+    <div style={{ ...theme, background:"var(--bg)", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <style>{CSS}</style>
+      <div style={{ textAlign:"center" }}>
+        <Logo size={32} />
+        <div style={{ marginTop:20, display:"flex", justifyContent:"center" }}>
+          <div style={{ width:30, height:30, border:"3px solid #00d4aa44", borderTop:"3px solid #00d4aa", borderRadius:"50%", animation:"spin 0.8s linear infinite" }} />
+        </div>
+        <p style={{ color:"var(--muted)", marginTop:12, fontSize:14 }}>Chargement...</p>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ ...theme, background:"var(--bg)", color:"var(--text)", minHeight:"100vh", transition:"background 0.3s,color 0.3s" }}>
@@ -936,11 +976,11 @@ export default function App() {
         {page==="plans"&&<PlansPage setPage={setPage} />}
         {page==="about"&&<AboutPage />}
         {page==="faq"&&<FAQPage />}
-        {page==="contact"&&<ContactPage token={session?.access_token} />}
+        {page==="contact"&&<ContactPage />}
         {page==="register"&&<RegisterPage setPage={setPage} setSession={setSession} />}
         {page==="login"&&<LoginPage setPage={setPage} setSession={setSession} />}
         {page==="dashboard"&&(session?<DashboardPage session={session} setPage={setPage} setSession={setSession} />:<LoginPage setPage={setPage} setSession={setSession} />)}
-        {page==="admin"&&<AdminPage />}
+        {page==="admin"&&(session?<AdminPage setPage={setPage} setSession={setSession} />:<LoginPage setPage={setPage} setSession={setSession} />)}
       </main>
 
       {!["dashboard","admin"].includes(page)&&(
@@ -949,7 +989,7 @@ export default function App() {
             <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr", gap:32, marginBottom:32 }}>
               <div>
                 <Logo size={22} />
-                <p style={{ color:"var(--muted)", fontSize:13, marginTop:14, lineHeight:1.7 }}>Plateforme d'investissement USDT sécurisée sur le réseau BEP20. Propulsée par Supabase.</p>
+                <p style={{ color:"var(--muted)", fontSize:13, marginTop:14, lineHeight:1.7 }}>Plateforme d'investissement USDT sécurisée sur le réseau BEP20.</p>
               </div>
               {[{title:"Plateforme",links:["Accueil","Plans VIP","FAQ"]},{title:"Légal",links:["CGU","Confidentialité"]},{title:"Contact",links:["support@worldsuccessusdt.com","admin@worldsuccessusdt.com"]}].map(col=>(
                 <div key={col.title}>
