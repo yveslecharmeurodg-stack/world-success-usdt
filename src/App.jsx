@@ -459,6 +459,10 @@ function LoginPage({ setPage, setSession }) {
   const [form, setForm] = useState({ email:"", password:"" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!form.email||!form.password) { setError("Veuillez remplir tous les champs."); return; }
@@ -479,6 +483,49 @@ function LoginPage({ setPage, setSession }) {
     setLoading(false);
   };
 
+  const handleForgotPassword = async () => {
+    if (!forgotEmail) return;
+    setForgotLoading(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+        method: "POST",
+        headers: { "apikey": SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+      setForgotSent(true);
+    } catch(e) { setForgotSent(true); }
+    setForgotLoading(false);
+  };
+
+  if (showForgot) return (
+    <div style={{ padding:"80px 20px", maxWidth:420, margin:"0 auto" }}>
+      <div style={{ textAlign:"center", marginBottom:32 }}>
+        <h1 style={{ fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:28, marginBottom:8 }}>🔑 Mot de passe oublié</h1>
+        <p style={{ color:"var(--muted)", fontSize:14 }}>Entrez votre email pour recevoir un lien de réinitialisation</p>
+      </div>
+      {forgotSent ? (
+        <Card style={{ textAlign:"center", padding:40 }}>
+          <div style={{ fontSize:48, marginBottom:16 }}>📧</div>
+          <h3 style={{ fontFamily:"'Syne',sans-serif", marginBottom:12 }}>Email envoyé !</h3>
+          <p style={{ color:"var(--muted)", fontSize:14, marginBottom:20 }}>Vérifiez votre boîte mail et cliquez le lien pour réinitialiser votre mot de passe.</p>
+          <Btn style={{ width:"100%" }} onClick={()=>{ setShowForgot(false); setForgotSent(false); setForgotEmail(""); }}>
+            Retour à la connexion
+          </Btn>
+        </Card>
+      ) : (
+        <Card>
+          <Input label="Votre email" type="email" value={forgotEmail} onChange={setForgotEmail} placeholder="vous@email.com" icon="📧" required />
+          <Btn style={{ width:"100%", marginTop:8 }} onClick={handleForgotPassword} disabled={!forgotEmail||forgotLoading}>
+            {forgotLoading?<Spinner />:"Envoyer le lien 📧"}
+          </Btn>
+          <p style={{ textAlign:"center", fontSize:13, color:"var(--muted)", marginTop:16 }}>
+            <span style={{ color:"#00d4aa", cursor:"pointer" }} onClick={()=>setShowForgot(false)}>← Retour à la connexion</span>
+          </p>
+        </Card>
+      )}
+    </div>
+  );
+
   return (
     <div style={{ padding:"80px 20px", maxWidth:420, margin:"0 auto" }}>
       <div style={{ textAlign:"center", marginBottom:32 }}>
@@ -489,7 +536,12 @@ function LoginPage({ setPage, setSession }) {
       <Card>
         <Input label="Email" type="email" value={form.email} onChange={v=>setForm({...form,email:v})} placeholder="vous@email.com" icon="📧" required />
         <Input label="Mot de passe" type="password" value={form.password} onChange={v=>setForm({...form,password:v})} placeholder="••••••••" icon="🔒" required />
-        <Btn style={{ width:"100%", marginTop:8 }} onClick={handleLogin} disabled={!form.email||!form.password||loading}>
+        <div style={{ textAlign:"right", marginBottom:16, marginTop:-8 }}>
+          <span style={{ color:"#00d4aa", cursor:"pointer", fontSize:13 }} onClick={()=>setShowForgot(true)}>
+            🔑 Mot de passe oublié ?
+          </span>
+        </div>
+        <Btn style={{ width:"100%" }} onClick={handleLogin} disabled={!form.email||!form.password||loading}>
           {loading?<Spinner />:"Se connecter →"}
         </Btn>
         <p style={{ textAlign:"center", fontSize:13, color:"var(--muted)", marginTop:16 }}>
