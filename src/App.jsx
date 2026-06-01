@@ -397,7 +397,7 @@ function RegisterPage({ setPage, setSession }) {
       if (data.error) throw new Error(data.error.message||"Erreur inscription");
       const uid = data.user?.id;
       if (uid) {
-        await sb.query("profiles","POST",{
+        await sb.query("Profiles","POST",{
           id:uid, nom:form.nom, prenom:form.prenom, email:form.email,
           tel:form.tel, pays:form.pays, parrain:form.parrain, code,
           balance:0, invested:0, profits:0, referrals:0,
@@ -467,7 +467,7 @@ function LoginPage({ setPage, setSession }) {
       const data = await sb.signIn(form.email, form.password);
       if (!data.access_token) throw new Error("Identifiants incorrects");
       setSession(data);
-      const profiles = await sb.query("profiles","GET",null,`?id=eq.${data.user.id}`);
+      const profiles = await sb.query("Profiles","GET",null,`?id=eq.${data.user.id}`);
       if (profiles && profiles[0]?.is_admin) {
         setPage("admin");
       } else {
@@ -517,8 +517,8 @@ function DashboardPage({ session, setPage, setSession }) {
 
   useEffect(()=>{
     if (!session?.user?.id) return;
-    sb.query("profiles","GET",null,`?id=eq.${session.user.id}`).then(d=>{ if(d&&d[0]) setProfile(d[0]); }).catch(console.error);
-    sb.query("transactions","GET",null,`?user_id=eq.${session.user.id}&order=created_at.desc`).then(d=>{ if(d) setTransactions(d); }).catch(console.error);
+    sb.query("Profiles","GET",null,`?id=eq.${session.user.id}`).then(d=>{ if(d&&d[0]) setProfile(d[0]); }).catch(console.error);
+    sb.query("Transactions","GET",null,`?user_id=eq.${session.user.id}&order=created_at.desc`).then(d=>{ if(d) setTransactions(d); }).catch(console.error);
   },[session,tab]);
 
   const handleWithdraw = async () => {
@@ -527,8 +527,8 @@ function DashboardPage({ session, setPage, setSession }) {
     if (amount>(profile?.balance||0)) { showNotif("❌ Solde insuffisant"); return; }
     setLoading(true);
     try {
-      await sb.query("transactions","POST",{ user_id:session.user.id, type:"Retrait", amount:-amount, status:"En attente", address:withAddress, fee:amount*0.01, net:amount*0.99, created_at:new Date().toISOString() });
-      await sb.query("profiles","PATCH",{ balance:(profile.balance||0)-amount },`?id=eq.${session.user.id}`);
+      await sb.query("Transactions","POST",{ user_id:session.user.id, type:"Retrait", amount:-amount, status:"En attente", address:withAddress, fee:amount*0.01, net:amount*0.99, created_at:new Date().toISOString() });
+      await sb.query("Profiles","PATCH",{ balance:(profile.balance||0)-amount },`?id=eq.${session.user.id}`);
       setProfile(p=>({...p,balance:(p.balance||0)-amount}));
       showNotif("✅ Demande de retrait soumise !");
       setWithAmount(""); setWithAddress("");
@@ -539,8 +539,8 @@ function DashboardPage({ session, setPage, setSession }) {
   const handleActivatePlan = async (plan) => {
     setLoading(true);
     try {
-      await sb.query("profiles","PATCH",{ active_plan:plan },`?id=eq.${session.user.id}`);
-      await sb.query("transactions","POST",{ user_id:session.user.id, type:"Activation Plan", amount:0, status:"Actif", plan_name:plan.name, created_at:new Date().toISOString() });
+      await sb.query("Profiles","PATCH",{ active_plan:plan },`?id=eq.${session.user.id}`);
+      await sb.query("Transactions","POST",{ user_id:session.user.id, type:"Activation Plan", amount:0, status:"Actif", plan_name:plan.name, created_at:new Date().toISOString() });
       setProfile(p=>({...p,active_plan:plan}));
       showNotif(`✅ Plan ${plan.name} activé !`);
     } catch(e) { showNotif("❌ Erreur"); }
@@ -766,25 +766,25 @@ function AdminPage({ setPage, setSession }) {
   const showNotif = msg => { setNotif(msg); setTimeout(()=>setNotif(""),3000); };
 
   useEffect(()=>{
-    sb.query("profiles").then(d=>{ if(d) setUsers(d); }).catch(console.error);
-    sb.query("transactions","GET",null,"?type=eq.Retrait&status=eq.En attente").then(d=>{ if(d) setWithdrawals(d); }).catch(console.error);
+    sb.query("Profiles").then(d=>{ if(d) setUsers(d); }).catch(console.error);
+    sb.query("Transactions","GET",null,"?type=eq.Retrait&status=eq.En attente").then(d=>{ if(d) setWithdrawals(d); }).catch(console.error);
     sb.query("support_messages","GET",null,"?order=created_at.desc").then(d=>{ if(d) setMessages(d); }).catch(console.error);
   },[tab]);
 
   const validateW = async w => {
-    await sb.query("transactions","PATCH",{status:"Validé"},`?id=eq.${w.id}`);
+    await sb.query("Transactions","PATCH",{status:"Validé"},`?id=eq.${w.id}`);
     setWithdrawals(p=>p.filter(x=>x.id!==w.id));
     showNotif("✅ Retrait validé !");
   };
   const rejectW = async w => {
     const u = users.find(x=>x.id===w.user_id);
-    await sb.query("transactions","PATCH",{status:"Refusé"},`?id=eq.${w.id}`);
-    if (u) await sb.query("profiles","PATCH",{balance:(u.balance||0)+Math.abs(w.amount)},`?id=eq.${w.user_id}`);
+    await sb.query("Transactions","PATCH",{status:"Refusé"},`?id=eq.${w.id}`);
+    if (u) await sb.query("Profiles","PATCH",{balance:(u.balance||0)+Math.abs(w.amount)},`?id=eq.${w.user_id}`);
     setWithdrawals(p=>p.filter(x=>x.id!==w.id));
     showNotif("❌ Retrait refusé.");
   };
   const toggleBlock = async u => {
-    await sb.query("profiles","PATCH",{blocked:!u.blocked},`?id=eq.${u.id}`);
+    await sb.query("Profiles","PATCH",{blocked:!u.blocked},`?id=eq.${u.id}`);
     setUsers(p=>p.map(x=>x.id===u.id?{...x,blocked:!x.blocked}:x));
     showNotif(u.blocked?"✅ Débloqué !":"🚫 Bloqué !");
   };
